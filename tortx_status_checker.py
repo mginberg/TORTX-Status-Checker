@@ -17,26 +17,26 @@ SUBSCRIPTION_KEY = "df7fbbbf94544018a06bf01f4400fb43"
 
 def get_lead_status(lead_id, source_id, claim_type="Personal Injury"):
     """
-    Call TortX API to get lead status with subscription-key in HEADER
+    Call TortX API to get lead status
+    SourceId is optional - will still call API if missing
     """
-    # Skip if either value is empty/null
-    if pd.isna(lead_id) or pd.isna(source_id) or str(lead_id).strip() == "" or str(source_id).strip() == "":
-        return "Missing Data"
+    # Skip if LeadId is empty/null
+    if pd.isna(lead_id) or str(lead_id).strip() == "":
+        return "Missing LeadId"
     
     try:
-        # Put subscription-key in HEADER (not in URL params!)
-        headers = {
-            "subscription-key": SUBSCRIPTION_KEY
-        }
-        
-        # Only LeadId, SourceId, and ClaimType go in params
+        # Start with required params
         params = {
+            "subscription-key": SUBSCRIPTION_KEY,
             "LeadId": str(lead_id).strip(),
-            "SourceId": str(source_id).strip(),
             "ClaimType": claim_type
         }
         
-        response = requests.post(API_URL, headers=headers, params=params, timeout=10)
+        # Add SourceId only if it exists
+        if not pd.isna(source_id) and str(source_id).strip() != "":
+            params["SourceId"] = str(source_id).strip()
+        
+        response = requests.post(API_URL, params=params, timeout=10)
         
         if response.status_code == 200:
             try:
@@ -72,8 +72,8 @@ if uploaded_file is not None:
         # Convert column letters to indices (0-based)
         col_l_idx = 11   # L column
         col_m_idx = 12   # M column
-        col_ak_idx = 36  # AK column (SourceId)
-        col_at_idx = 45  # AT column (LeadId)
+        col_ak_idx = 36  # AK column (SourceId - optional)
+        col_at_idx = 45  # AT column (LeadId - required)
         
         if len(columns_list) > max(col_l_idx, col_m_idx, col_ak_idx, col_at_idx):
             col_l = columns_list[col_l_idx]
@@ -81,7 +81,7 @@ if uploaded_file is not None:
             col_source_id = columns_list[col_ak_idx]
             col_lead_id = columns_list[col_at_idx]
             
-            st.info(f"✅ Using columns: **LeadId (AT)**='{col_lead_id}', **SourceId (AK)**='{col_source_id}'")
+            st.info(f"✅ Using columns: **LeadId (AT)**='{col_lead_id}', **SourceId (AK)**='{col_source_id}' (optional)")
             
             # Show sample data from these columns
             with st.expander("🔍 Sample Data from Target Columns", expanded=False):
@@ -104,6 +104,7 @@ if uploaded_file is not None:
                 # Initialize status column
                 statuses = []
                 error_count = 0
+                missing_count = 0
                 
                 # Process each row
                 total_rows = len(df)
@@ -117,7 +118,9 @@ if uploaded_file is not None:
                     status = get_lead_status(lead_id, source_id, claim_type)
                     statuses.append(status)
                     
-                    if "Error" in str(status):
+                    if "Missing LeadId" in str(status):
+                        missing_count += 1
+                    elif "Error" in str(status):
                         error_count += 1
                     
                     # Update progress
@@ -126,12 +129,12 @@ if uploaded_file is not None:
                     # Add small delay to avoid rate limiting
                     time.sleep(0.2)
                 
-                if error_count == total_rows:
-                    status_text.error("⚠️ All requests failed! Check API credentials.")
+                if error_count == total_rows - missing_count:
+                    status_text.error(f"⚠️ All API calls failed! {missing_count} had missing LeadId.")
                 elif error_count > 0:
-                    status_text.warning(f"⚠️ Complete with {error_count} errors.")
+                    status_text.warning(f"⚠️ Complete! {error_count} errors, {missing_count} missing LeadId.")
                 else:
-                    status_text.success("✅ All statuses fetched successfully!")
+                    status_text.success(f"✅ All statuses fetched! {missing_count} had missing LeadId.")
                 
                 # Create output dataframe with only columns L, M, and Status
                 output_df = pd.DataFrame({
@@ -186,12 +189,35 @@ else:
     
     ### 📊 Required Columns
     
-    - **Column AK**: SourceId
-    - **Column AT**: LeadId
+    - **Column AT**: LeadId (required)
+    - **Column AK**: SourceId (optional - will still work without it)
     - **Column L**: Will be included in report
     - **Column M**: Will be included in report
     """)
 
 # Add footer
 st.markdown("---")
-st.markdown("💡 **Tip:** Subscription key is sent in header for security")
+st.markdown("💡 **Note:** SourceId is optional. API will be called even if SourceId is blank.")
+'''
+
+with open('tortx_status_checker.py', 'w') as f:
+    f.write(streamlit_final)
+
+print("✅ FINAL VERSION CREATED: tortx_status_checker.py")
+print("\n" + "="*60)
+print("KEY UPDATES:")
+print("="*60)
+print("✓ subscription-key in URL params (as per your string)")
+print("✓ LeadId is REQUIRED")
+print("✓ SourceId is OPTIONAL (will call API even if blank)")
+print("✓ Only checks for missing LeadId, not SourceId")
+print("\n" + "="*60)
+print("REQUEST FORMAT:")
+print("="*60)
+print("With SourceId:")
+print("  POST https://api.tortx.law/external/intake/status")
+print("    ?subscription-key=xxx&LeadId=123&SourceId=456&ClaimType=Personal Injury")
+print("\nWithout SourceId:")
+print("  POST https://api.tortx.law/external/intake/status")
+print("    ?subscription-key=xxx&LeadId=123&ClaimType=Personal Injury")
+print("\n✅ Ready to deploy to GitHub!")
