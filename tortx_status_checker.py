@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -55,25 +56,24 @@ if uploaded_file is not None:
         st.dataframe(df.head(), use_container_width=True)
 
         # Check if required columns exist
-        # Column AR is index 43 (0-indexed), Column AJ is index 35
         columns_list = df.columns.tolist()
 
-        # Convert column letters to indices
-        # AR = column 44 (index 43), AJ = column 36 (index 35)
-        # L = column 12 (index 11), M = column 13 (index 12)
+        # Convert column letters to indices (0-based)
+        # Column L = 11, Column M = 12
+        # Column AK = 36 (SourceId), Column AT = 45 (LeadId)
 
-        col_ar_idx = 43  # AR column
-        col_aj_idx = 35  # AJ column
         col_l_idx = 11   # L column
         col_m_idx = 12   # M column
+        col_ak_idx = 36  # AK column (SourceId)
+        col_at_idx = 45  # AT column (LeadId)
 
-        if len(columns_list) > max(col_ar_idx, col_aj_idx, col_l_idx, col_m_idx):
-            col_lead_id = columns_list[col_ar_idx]
-            col_source_id = columns_list[col_aj_idx]
+        if len(columns_list) > max(col_l_idx, col_m_idx, col_ak_idx, col_at_idx):
             col_l = columns_list[col_l_idx]
             col_m = columns_list[col_m_idx]
+            col_source_id = columns_list[col_ak_idx]
+            col_lead_id = columns_list[col_at_idx]
 
-            st.info(f"Using columns: LeadId='{col_lead_id}', SourceId='{col_source_id}'")
+            st.info(f"✅ Using columns: LeadId (AT)='{col_lead_id}', SourceId (AK)='{col_source_id}'")
 
             # Button to fetch statuses
             if st.button("🔄 Fetch Lead Statuses", type="primary"):
@@ -133,7 +133,8 @@ if uploaded_file is not None:
                 st.bar_chart(status_counts)
 
         else:
-            st.error("❌ The uploaded CSV doesn't have enough columns. Please check your file.")
+            st.error(f"❌ The uploaded CSV doesn't have enough columns. Found {len(columns_list)} columns, need at least 46.")
+            st.info(f"Please make sure your CSV has columns L, M, AK (SourceId), and AT (LeadId)")
 
     except Exception as e:
         st.error(f"❌ Error processing file: {str(e)}")
@@ -144,4 +145,4 @@ else:
 
 # Add footer
 st.markdown("---")
-st.markdown("💡 **Tip:** Make sure your CSV file contains the Zapier history with LeadId in column AR and SourceId in column AJ")
+st.markdown("💡 **Tip:** Make sure your CSV file contains the Zapier history with LeadId in column AT and SourceId in column AK")
